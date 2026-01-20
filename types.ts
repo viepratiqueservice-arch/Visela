@@ -7,17 +7,49 @@ export enum Page {
   Profile = 'Profile',
   Market = 'Market',
   Admin = 'Admin',
-  Cercle = 'Cercle',
-  Subscription = 'Subscription'
+  Cercle = 'Cercle'
+}
+
+export interface Commune {
+  id: string;
+  name: string;
+}
+
+export interface Zone {
+  id: string;
+  commune_id: string;
+  name: string;
+}
+
+export interface Secteur {
+  id: string;
+  zone_id: string;
+  name: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export interface UserAddress {
+  id: string;
+  userClientId: string;
+  label: string;
+  details: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface ReloadRequest {
   id: string;
-  userId: string;
+  userClientId: string;
   userName: string;
   amount: number;
-  date: string;
   status: 'En attente' | 'Validé' | 'Refusé';
+  created_at: string;
 }
 
 export interface User {
@@ -37,16 +69,13 @@ export interface FoodItem {
   name: string;
   description: string;
   price: number; 
-  purchasePrice?: number; 
-  profit?: number; 
   unit: string; 
   unitQuantity: number; 
   image: string;
   rating: number;
   category: string;
-  deliveryTime: string;
-  stock?: number;
-  isCercleOnly?: boolean;
+  stock: number;
+  isCercleOnly: boolean;
 }
 
 export interface CartItem extends FoodItem {
@@ -65,7 +94,3 @@ export interface Order {
   customerName?: string;
   customerClientId?: string;
 }
-
-export interface Sector { id: string; name: string; }
-export interface Zone { id: string; name: string; sectors: Sector[]; }
-export interface Commune { id: string; name: string; zones: Zone[]; }

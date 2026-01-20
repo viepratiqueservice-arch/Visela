@@ -1,5 +1,5 @@
 {
-  "name": "Visela Food",
+  "name": "Visela",
   "description": "Une application de livraison alimentaire élégante et moderne offrant une expérience utilisateur fluide pour commander vos plats préférés et faire votre marché.",
   "requestFramePermissions": [
     "camera",
