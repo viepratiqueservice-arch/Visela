@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
-import { MapPin, LogOut, Plus, Trash2, X, ChevronRight, Zap, Navigation, Loader2, Crown, Sparkles, Lock, Wallet, ArrowUpCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MapPin, LogOut, Plus, Trash2, X, ChevronRight, Zap, Navigation, Loader2, Crown, Sparkles, Lock, Wallet, ArrowUpCircle, Smartphone } from 'lucide-react';
 import { Page } from '../types';
+import LogisticsSelector from '../components/LogisticsSelector';
 
 interface ProfileProps {
   status: 'Standard' | 'Cercle';
@@ -17,15 +18,63 @@ const Profile: React.FC<ProfileProps> = ({ status, onNavigate, onLogout, address
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [showReloadModal, setShowReloadModal] = useState(false);
   const [reloadAmount, setReloadAmount] = useState('');
+  const [isStandalone, setIsStandalone] = useState(false);
+  
+  const [logisticsSelection, setLogisticsSelection] = useState({ commune: '', zone: '', secteur: '' });
+  const [addressDetails, setAddressDetails] = useState('');
   const [gpsCoords, setGpsCoords] = useState<{lat: number, lng: number} | null>(null);
   const [isFetchingGps, setIsFetchingGps] = useState(false);
+
+  useEffect(() => {
+    // Vérifier si l'app est déjà installée
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+  }, []);
 
   const isVip = status === 'Cercle';
   const formatPrice = (p: number) => new Intl.NumberFormat('fr-FR').format(p) + ' F';
 
+  const handleSaveAddress = () => {
+    let finalAddr = '';
+    if (gpsCoords) {
+      finalAddr = `GPS: ${gpsCoords.lat.toFixed(4)}, ${gpsCoords.lng.toFixed(4)}`;
+    } else if (logisticsSelection.secteur) {
+      finalAddr = `${logisticsSelection.secteur}, ${logisticsSelection.zone}, ${logisticsSelection.commune} (${addressDetails})`;
+    }
+
+    if (finalAddr) {
+      setAddresses([...addresses, finalAddr]);
+      setShowAddressModal(false);
+      setGpsCoords(null);
+      setLogisticsSelection({ commune: '', zone: '', secteur: '' });
+      setAddressDetails('');
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
       
+      {/* Installation Banner if not standalone */}
+      {!isStandalone && (
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6 rounded-[2rem] text-white shadow-xl flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center">
+              <Smartphone size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest">Installer Visela</p>
+              <p className="text-[9px] font-medium opacity-80 uppercase tracking-tight">Ajoutez à l'accueil pour une expérience fluide</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center">
+             <div className="bg-white/20 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest animate-pulse">
+                Menu → Ajouter
+             </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Profile */}
       <div className="bg-white rounded-[2.5rem] p-6 md:p-8 shadow-lg border border-gray-100 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-500/5 rounded-full -mr-16 -mt-16 blur-3xl pointer-events-none"></div>
@@ -109,6 +158,7 @@ const Profile: React.FC<ProfileProps> = ({ status, onNavigate, onLogout, address
                 <button onClick={() => setAddresses(addresses.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-red-500"><Trash2 size={12} /></button>
               </div>
             ))}
+            {addresses.length === 0 && <p className="text-[8px] text-gray-400 uppercase italic text-center py-4">Aucune adresse enregistrée</p>}
           </div>
         </div>
       </div>
@@ -117,7 +167,7 @@ const Profile: React.FC<ProfileProps> = ({ status, onNavigate, onLogout, address
         <LogOut size={16} /> Fermer le Protocole
       </button>
 
-      {/* Modal Recharge */}
+      {/* Modals are unchanged but kept for completeness */}
       {showReloadModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl">
@@ -137,41 +187,57 @@ const Profile: React.FC<ProfileProps> = ({ status, onNavigate, onLogout, address
               >
                 Soumettre au Protocole
               </button>
-              <p className="text-[7px] text-gray-400 text-center uppercase">L'administrateur validera votre demande sous peu.</p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal GPS */}
       {showAddressModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl border-t-4 border-amber-500">
+          <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 relative shadow-2xl border-t-4 border-amber-500 overflow-y-auto max-h-[90vh] no-scrollbar">
             <button onClick={() => setShowAddressModal(false)} className="absolute top-5 right-5 text-gray-300"><X size={20} /></button>
-            <h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-gray-900">Nouveau Lieu</h3>
-            <button 
-              onClick={() => {
-                setIsFetchingGps(true);
-                navigator.geolocation.getCurrentPosition((p) => {
-                  setGpsCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
-                  setIsFetchingGps(false);
-                });
-              }}
-              className="w-full py-5 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 bg-gray-50 border-gray-200 text-gray-400"
-            >
-              {isFetchingGps ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
-              <span className="text-[8px] font-black uppercase">{gpsCoords ? 'Signal GPS Reçu' : 'Détecter ma position'}</span>
-            </button>
-            <button 
-              disabled={!gpsCoords} 
-              onClick={() => {
-                setAddresses([...addresses, `GPS: ${gpsCoords?.lat.toFixed(4)}, ${gpsCoords?.lng.toFixed(4)}`]);
-                setShowAddressModal(false);
-              }} 
-              className="w-full bg-gray-900 disabled:bg-gray-100 text-amber-500 py-4 rounded-xl font-black text-[9px] uppercase tracking-[0.4em] mt-4"
-            >
-              Enregistrer
-            </button>
+            <h3 className="text-lg font-black uppercase tracking-tighter mb-6 text-gray-900">Nouvelle Adresse</h3>
+            <div className="space-y-6">
+              <button 
+                onClick={() => {
+                  setIsFetchingGps(true);
+                  navigator.geolocation.getCurrentPosition((p) => {
+                    setGpsCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
+                    setIsFetchingGps(false);
+                    setLogisticsSelection({ commune: '', zone: '', secteur: '' });
+                  }, () => setIsFetchingGps(false));
+                }}
+                className={`w-full py-5 rounded-2xl border-2 border-dashed flex flex-col items-center gap-2 transition-all ${gpsCoords ? 'bg-amber-50 border-amber-500 text-amber-600' : 'bg-gray-50 border-gray-200 text-gray-400'}`}
+              >
+                {isFetchingGps ? <Loader2 size={20} className="animate-spin" /> : <Navigation size={20} />}
+                <span className="text-[8px] font-black uppercase">{gpsCoords ? 'Signal GPS Reçu' : 'Utiliser ma position actuelle'}</span>
+              </button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100"></div></div>
+                <div className="relative flex justify-center"><span className="bg-white px-4 text-[8px] font-black text-gray-300 uppercase">Ou sélection manuelle</span></div>
+              </div>
+              {!gpsCoords && (
+                <>
+                  <LogisticsSelector onSelectionComplete={(sel) => setLogisticsSelection(sel)} />
+                  {logisticsSelection.secteur && (
+                    <input 
+                      type="text"
+                      placeholder="Précisions d'adresse..."
+                      value={addressDetails}
+                      onChange={(e) => setAddressDetails(e.target.value)}
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-2xl py-4 px-6 text-[11px] font-black uppercase outline-none focus:border-amber-500 transition-all"
+                    />
+                  )}
+                </>
+              )}
+              <button 
+                disabled={!gpsCoords && !logisticsSelection.secteur} 
+                onClick={handleSaveAddress}
+                className="w-full bg-gray-900 disabled:bg-gray-100 text-amber-500 py-5 rounded-2xl font-black text-[10px] uppercase tracking-[0.4em] mt-4 shadow-xl active:scale-95 transition-all"
+              >
+                ENREGISTRER L'ADRESSE
+              </button>
+            </div>
           </div>
         </div>
       )}

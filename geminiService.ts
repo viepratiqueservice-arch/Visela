@@ -1,18 +1,44 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Décodage audio PCM pour Gemini TTS
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
+function decodeBase64(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
 
 export const getGeminiRecommendations = async (mood: string) => {
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Propose 3 types de produits alimentaires FRAIS et BRUTS (ex: fruits, légumes, céréales, eaux) parfaits pour quelqu'un qui se sent "${mood}". Donne juste les noms des produits séparés par des virgules, sans plats préparés.`,
-      // Removed maxOutputTokens to follow guidelines: avoid setting it if not required, 
-      // or must set thinkingBudget if it is set.
-      config: {
-        temperature: 0.7,
-      },
+      config: { temperature: 0.7 },
     });
     return response.text?.split(',').map(s => s.trim()) || [];
   } catch (error) {
@@ -21,25 +47,34 @@ export const getGeminiRecommendations = async (mood: string) => {
   }
 };
 
-export const getRecipesForCategory = async (category: string) => {
+export const getChefTipAudio = async (category: string) => {
   try {
+    const prompt = `En tant que chef de cuisine de Visela, donne un conseil culinaire de 10 mots maximum pour sublimer les produits de la catégorie ${category}.`;
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: `Donne-moi 3 idées de recettes gourmandes et simples que je peux faire avec des produits de la catégorie "${category}". Pour chaque recette, donne un titre court et une description de 10 mots.`,
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
-        tools: [{ googleSearch: {} }],
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
       },
     });
 
-    const text = response.text;
-    const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-    const urls = sources
-      .filter((chunk: any) => chunk.web)
-      .map((chunk: any) => ({ title: chunk.web.title, uri: chunk.web.uri }));
-
-    return { text, urls };
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (base64Audio) {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const audioBuffer = await decodeAudioData(decodeBase64(base64Audio), audioContext, 24000, 1);
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      source.start();
+      return response.candidates?.[0]?.content?.parts?.[1]?.text || "Bon appétit !";
+    }
   } catch (error) {
-    console.error("Gemini recipe error:", error);
-    return { text: "Impossible de charger les recettes pour le moment.", urls: [] };
+    console.error("Chef TTS error:", error);
   }
+  return "Sublimez vos plats avec passion.";
 };
